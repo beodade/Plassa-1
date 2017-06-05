@@ -11,14 +11,14 @@ class FacebookMiner(object):
 		self.r=search_rayon
 		self.dim=len(self.points)
 		self._type=_type
-	def _mine(self,progress=True):
+	def _mine(self,progress=True,):
 		if progress:
-			bar = FillingSquaresBar('Mining:',max=self.dim)
+			self.bar = FillingSquaresBar('Mining:',max=self.dim)
 			for p in self.points:
 				for pla in self.get_places(p):
 					yield pla
-				bar.next()
-			bar.finish()
+				self.bar.next()
+			self.bar.finish()
 		else:
 			for p in self.points:
 				for pla in self.get_places(p):
@@ -42,26 +42,27 @@ class FacebookMiner(object):
 				pass
 			yield entity		
 
-
-
-
 class PageMiner(object):
 	failed_posts=[]
 	post_fields='?fields=message,name,shares,comments.limit(1).summary(1),created_time,reactions.type(LIKE).limit(0).summary(1).as(LIKE),reactions.type(WOW).limit(0).summary(1).as(WOW),reactions.type(SAD).limit(0).summary(1).as(SAD),reactions.type(LOVE).limit(0).summary(1).as(LOVE),reactions.type(ANGRY).limit(0).summary(1).as(ANGRY),reactions.type(HAHA).limit(0).summary(1).as(HAHA)'
 	comment_fields='?fields=likes.limit(0).summary(1),message,comment_count,from,attachment'
 	nb_posts=0
-	def __init__(self,API_KEY,page):
+	def __init__(self,page,API_KEY,_from='',posts_ids=[]):
 		self.graph = GraphAPI(API_KEY,version='2.9')
 		self.name=page['name']
 		self.id=page['fb_id']
 		self.type=page['type']
-		self.pags=page['tags']
-	def _mine(self,_from='',progress=True):
-		post_bach=[{'method': 'GET', 'relative_url': p_id+self.post_fields} for p_id in self.posts_ids(_from)]
-		self.nb_posts=len(post_bach)
+		self.type=page['type'] 
+		self._from=_from
+		self.posts_ids=posts_ids if posts_ids!=[] else [u for u in self.get_posts_ids()]
+		self.nb_posts=len(self.posts_ids)
+	def _mine(self,post_list=[],progress=True):
+		post_list=post_list if post_list!=[] else self.posts_ids
+		post_bach=[{'method': 'GET', 'relative_url': p_id+self.post_fields} for p_id in post_list]
+		n=len(post_list)
 		posts=self.graph.batch(post_bach)
 		if progress:
-			bar = FillingSquaresBar('Mining %s:'%self.name, max=self.nb_posts)
+			bar = FillingSquaresBar('Mining %s:'%self.name, max=n)
 			for post in posts:
 				p=self.clean_post(post)
 				if p!=None:
@@ -72,14 +73,17 @@ class PageMiner(object):
 			for post in posts:
 				p=self.clean_post(post)
 				if p!=None:
-					yield p		
-	def posts_ids(self,_from=''):
+					yield p	
+	def parallel_mine(self):
+		return None
+
+	def get_posts_ids(self):
 		if self.type=='page':
 			posts_url=str(self.id)+'/posts'
 		elif self.type=='group':
 			posts_url=str(self.id)+'/feed'
 
-		id_lists=self.graph.get(posts_url,page=True,limit=100,fields='id') if _from=='' else self.graph.get(posts_url,page=True,limit=100,fields='id',since=_from)
+		id_lists=self.graph.get(posts_url,page=True,limit=100,fields='id') if self._from=='' else self.graph.get(posts_url,page=True,limit=100,fields='id',since=self._from)
 
 		for id_list in id_lists:
 			for d in id_list["data"]:
