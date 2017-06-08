@@ -1,5 +1,5 @@
 from facepy import GraphAPI
-import datetime
+from datetime import datetime, timedelta
 from progress.bar import FillingSquaresBar
 from pprint import pprint as pp
 class FacebookMiner(object):
@@ -11,7 +11,7 @@ class FacebookMiner(object):
 		self.r=search_rayon
 		self.dim=len(self.points)
 		self._type=_type
-	def _mine(self,progress=True,):
+	def _mine(self,progress=True):
 		if progress:
 			self.bar = FillingSquaresBar('Mining:',max=self.dim)
 			for p in self.points:
@@ -47,13 +47,16 @@ class PageMiner(object):
 	post_fields='?fields=message,name,shares,comments.limit(1).summary(1),created_time,reactions.type(LIKE).limit(0).summary(1).as(LIKE),reactions.type(WOW).limit(0).summary(1).as(WOW),reactions.type(SAD).limit(0).summary(1).as(SAD),reactions.type(LOVE).limit(0).summary(1).as(LOVE),reactions.type(ANGRY).limit(0).summary(1).as(ANGRY),reactions.type(HAHA).limit(0).summary(1).as(HAHA)'
 	comment_fields='?fields=likes.limit(0).summary(1),message,comment_count,from,attachment'
 	nb_posts=0
-	def __init__(self,page,API_KEY,_from='',posts_ids=[]):
+	def __init__(self,page,API_KEY,update=True,posts_ids=[]):
 		self.graph = GraphAPI(API_KEY,version='2.9')
 		self.name=page['name']
 		self.id=page['fb_id']
 		self.type=page['type']
-		self.type=page['type'] 
-		self._from=_from
+		self.type=page['type']
+		if update==True:
+			self._from=page['last_update']
+		else:
+			self._from=''
 		self.posts_ids=posts_ids if posts_ids!=[] else [u for u in self.get_posts_ids()]
 		self.nb_posts=len(self.posts_ids)
 	def _mine(self,post_list=[],progress=True):
@@ -74,9 +77,6 @@ class PageMiner(object):
 				p=self.clean_post(post)
 				if p!=None:
 					yield p	
-	def parallel_mine(self):
-		return None
-
 	def get_posts_ids(self):
 		if self.type=='page':
 			posts_url=str(self.id)+'/posts'
@@ -112,7 +112,7 @@ class PageMiner(object):
 		except:
 			self.failed_posts.append(raw_post['id'])
 			return None
-		post['created_time']=datetime.datetime.strptime(raw_post['created_time'], '%Y-%m-%dT%H:%M:%S+0000')	
+		post['created_time']=datetime.strptime(raw_post['created_time'], '%Y-%m-%dT%H:%M:%S+0000')	
 		try:
 			post['#shares']=raw_post['shares']['count']
 		except:
@@ -175,9 +175,8 @@ class PageMiner(object):
 			for d in id_list["data"]:
 				yield d['id']
 
-
-
-
-
-
-
+def update_date(fb_id,db):
+	last_update=db.Facebook_posts.find({'origin':fb_id},{'created_time':1,'_id':0}).sort('created_time',-1)[0]['created_time']
+	nb_of_offset_days=1 # we want un update of the recents posts.
+	last_update=last_update-timedelta(days=nb_of_offset_days)
+	db.Facebook_pages.update_one({'fb_id':fb_id},{ '$set': { "last_update" : last_update } })
