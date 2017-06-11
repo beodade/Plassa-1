@@ -35,3 +35,4 @@ def haversine(lon1, lat1, lon2, lat2):
 	r = 6371000 # Radius of earth in meters. Use 3956 for miles
 	return c*r
 fields='?fields=is_community_page,category,category_list,fan_count,hours,link,location,name,name_with_location_descriptor,overall_star_rating,parking,phone,rating_count,single_line_address,store_location_descriptor,website,were_here_count'
+isLatin = lambda s: len(s) == len(s.encode())
